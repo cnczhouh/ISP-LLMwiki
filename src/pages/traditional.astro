@@ -1,0 +1,149 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getKnowledgePages } from '../lib/content';
+import { getPagePlatform, kindLabels, pagesForKind } from '../lib/taxonomy';
+
+const pages = getKnowledgePages();
+const platformPages = pagesForKind(pages, 'platforms');
+const issuePages = pagesForKind(pages, 'issues');
+const modulePages = pagesForKind(pages, 'modules');
+const workflowPages = pagesForKind(pages, 'workflows');
+const toolPages = pagesForKind(pages, 'tools');
+const byUpdatedDesc = (a: (typeof pages)[number], b: (typeof pages)[number]) =>
+  b.updatedAt - a.updatedAt || a.title.localeCompare(b.title, 'zh-Hans-CN');
+const publicPages = pages.filter((page) => page.kind !== 'logs' && page.title !== '知识库维护索引');
+const recentPages = [...publicPages].sort(byUpdatedDesc).slice(0, 5);
+
+const intentCards = [
+  {
+    title: '我遇到问题了',
+    description: '偏色、噪声、拖影、闪烁、高光过曝。',
+    href: '/issues/',
+    action: '问题列表',
+    meta: `${issuePages.length} 个问题`,
+    subActions: [
+      { label: '问知识库', href: '/ask/?mode=diagnose' },
+      { label: '问题分类', href: '/knowledge/wiki/indexes/问题分类索引/' },
+    ],
+  },
+  {
+    title: '我要学习',
+    description: '选一个目标平台，看调试流程和模块地图。',
+    href: '/platforms/',
+    action: '选择平台',
+    meta: `${platformPages.length} 个平台`,
+    subActions: [
+      { label: '调试流程', href: '/workflows/' },
+      { label: '功能模块', href: '/modules/' },
+    ],
+  },
+  {
+    title: '我要查资料',
+    description: '数据手册、调试手册、工具说明和原始 PDF。',
+    href: '/knowledge/wiki/indexes/资料来源索引/',
+    action: '资料来源',
+    meta: `${toolPages.length} 个工具`,
+    subActions: [
+      { label: '调试工具', href: '/tools/' },
+      { label: '总导航', href: '/knowledge/wiki/indexes/ISP调试知识库导航/' },
+    ],
+  },
+  {
+    title: '瞎逛逛',
+    description: '看看最近更新、通用风险和完整索引。',
+    href: '/knowledge/wiki/indexes/ISP调试知识库导航/',
+    action: '随便看看',
+    meta: `${pages.length} 篇内容`,
+    subActions: [
+      { label: 'AllInAI', href: '/allinai/?intent=browse' },
+      { label: '通用风险', href: '/knowledge/wiki/workflows/跨平台_ISP_通用风险点检查表/' },
+    ],
+  },
+];
+---
+
+<BaseLayout title="传统页面" description="面向 ISP 图像调试的个人知识 Web 分享网站">
+  <section class="intent-home">
+    <header class="intent-hero">
+      <p class="home-eyebrow">ISP Notes</p>
+      <h1>传统页面</h1>
+      <p>按页面结构浏览：问题、平台、模块、流程、工具和资料索引。</p>
+    </header>
+
+    <section class="intent-grid" aria-label="首页入口">
+      {intentCards.map((entry) => (
+        <article class="intent-card">
+          <a class="intent-main-link" href={entry.href}>
+            <span class="intent-mark" aria-hidden="true"></span>
+            <span class="intent-copy">
+              <strong>{entry.title}</strong>
+              <small>{entry.description}</small>
+            </span>
+            <em>{entry.meta}</em>
+          </a>
+          <div class="intent-actions">
+            <a class="button" href={entry.href}>{entry.action}</a>
+            {entry.subActions.map((item) => (
+              <a class="outline-button" href={item.href}>{item.label}</a>
+            ))}
+          </div>
+        </article>
+      ))}
+    </section>
+
+    <section class="intent-platforms" aria-label="学习平台">
+      <div class="section-title">
+        <div>
+          <span>学习</span>
+          <h2>选择目标平台</h2>
+        </div>
+        <a href="/platforms/">全部平台</a>
+      </div>
+      <div class="intent-platform-list">
+        {platformPages.map((page) => (
+          <a href={page.url}>
+            <strong>{page.title}</strong>
+            <small>{page.description || '平台资料入口'}</small>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <section class="intent-footer-grid">
+      <section class="intent-light-panel">
+        <div class="section-title compact">
+          <div>
+            <span>最近</span>
+            <h2>最近更新</h2>
+          </div>
+        </div>
+        <div class="intent-update-list">
+          {recentPages.map((page) => (
+            <a href={page.url}>
+              <span>
+                <strong>{page.title}</strong>
+                <small>{kindLabels[page.kind]} / {getPagePlatform(page)}</small>
+              </span>
+              <time>{page.updatedAtLabel}</time>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section class="intent-light-panel">
+        <div class="section-title compact">
+          <div>
+            <span>概览</span>
+            <h2>知识库</h2>
+          </div>
+        </div>
+        <div class="intent-mini-stats">
+          <a href="/issues/"><strong>{issuePages.length}</strong><span>问题</span></a>
+          <a href="/modules/"><strong>{modulePages.length}</strong><span>模块</span></a>
+          <a href="/workflows/"><strong>{workflowPages.length}</strong><span>流程</span></a>
+          <a href="/platforms/"><strong>{platformPages.length}</strong><span>平台</span></a>
+        </div>
+      </section>
+    </section>
+  </section>
+</BaseLayout>

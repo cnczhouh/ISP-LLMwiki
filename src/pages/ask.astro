@@ -1,0 +1,525 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { createRagChunks } from '../lib/rag';
+import { llmModelOptions, unsupportedLlmModelOptions } from '../lib/llm';
+
+const ragChunks = createRagChunks();
+const modelOptions = llmModelOptions.map(({ id, label }) => ({ id, label }));
+const disabledModelOptions = unsupportedLlmModelOptions.map(({ id, label }) => ({ id, label }));
+const examples = [
+  '晚上画面很糊，车动起来还有拖尾',
+  '画面有点灰，黑的地方不黑',
+  '灯牌和车灯那里一闪一闪的',
+  'SC121AT HDR 高光过曝怎么排查',
+  'ISX031 暗部发灰先看哪些模块',
+  '拖影和降噪有什么关系？',
+];
+---
+
+<BaseLayout title="问知识库" description="基于知识库引用的 ISP 调试问答">
+  <section class="ask-page">
+    <header class="ask-header">
+      <p class="eyebrow" id="askEyebrow">问答</p>
+      <h1 id="askTitle">问知识库</h1>
+      <p class="lead" id="askLead">输入平台、模块或现象，先检索知识库，再基于引用生成回答。</p>
+    </header>
+
+    <section class="ask-workspace" aria-label="问知识库">
+      <form class="ask-form" id="askForm">
+        <label class="ask-input-label" for="askInput" id="askInputLabel">问题</label>
+        <textarea id="askInput" rows="4" placeholder="例如：SC121AT HDR 高光过曝怎么排查"></textarea>
+        <label class="ask-model-field" for="askModel">
+          <span>模型</span>
+          <select id="askModel" name="model">
+            <optgroup label="可用模型">
+              {modelOptions.map((option) => (
+                <option value={option.id}>{option.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="暂不可用">
+              {disabledModelOptions.map((option) => (
+                <option value={option.id} disabled>{option.label}</option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
+        <div class="ask-form-actions">
+          <button class="button" id="askSubmit" type="submit">生成回答</button>
+          <button class="outline-button" id="clearAsk" type="button">清空</button>
+          <a class="outline-button" href="/allinai/">进入 AllInAI</a>
+          <span>{ragChunks.length} 个知识片段</span>
+        </div>
+      </form>
+
+      <div class="ask-examples" aria-label="常见问题">
+        {examples.map((example) => (
+          <button type="button" data-example={example}>{example}</button>
+        ))}
+      </div>
+
+      <section class="ask-answer" id="askAnswer" hidden>
+        <div class="ask-answer-head">
+          <div>
+            <span id="askMode">回答</span>
+            <h2>知识库回答</h2>
+          </div>
+          <button class="outline-button" id="copyContext" type="button">复制上下文</button>
+        </div>
+        <div class="ask-model-answer" id="askModelAnswer"></div>
+        <div class="ask-summary" id="askSummary"></div>
+        <div class="ask-results" id="askResults"></div>
+      </section>
+
+      <section class="ask-empty" id="askEmpty">
+        <h2>等待问题</h2>
+        <p id="askEmptyText">可以输入“平台 + 现象”或“模块 + 调试目标”。</p>
+      </section>
+    </section>
+  </section>
+
+  <script is:inline define:vars={{ ragChunks, modelOptions }}>
+    const askForm = document.getElementById('askForm');
+    const askEyebrow = document.getElementById('askEyebrow');
+    const askTitle = document.getElementById('askTitle');
+    const askLead = document.getElementById('askLead');
+    const askInputLabel = document.getElementById('askInputLabel');
+    const askInput = document.getElementById('askInput');
+    const askModel = document.getElementById('askModel');
+    const askSubmit = document.getElementById('askSubmit');
+    const clearAsk = document.getElementById('clearAsk');
+    const askAnswer = document.getElementById('askAnswer');
+    const askEmpty = document.getElementById('askEmpty');
+    const askEmptyText = document.getElementById('askEmptyText');
+    const askMode = document.getElementById('askMode');
+    const askModelAnswer = document.getElementById('askModelAnswer');
+    const askSummary = document.getElementById('askSummary');
+    const askResults = document.getElementById('askResults');
+    const copyContext = document.getElementById('copyContext');
+    const defaultModel = modelOptions[0]?.id || 'mimo-v2.5';
+    const modelLabels = Object.fromEntries(modelOptions.map((option) => [option.id, option.label]));
+    let currentMode = 'ask';
+    let lastContext = '';
+
+    const kindHints = {
+      issues: ['问题', '现象', '排查', '原因', '怎么', '为什么', '异常', '过曝', '偏色', '噪声', '拖影', '闪烁'],
+      modules: ['模块', '参数', '调整', '调试', '寄存器', '功能', '影响'],
+      workflows: ['流程', '步骤', '顺序', '先后', '路线'],
+      tools: ['工具', '软件', '导入', '导出', '连接'],
+      platforms: ['平台', '芯片', 'sensor', 'isp'],
+    };
+
+    function applyMode(mode) {
+      currentMode = mode === 'diagnose' ? 'diagnose' : 'ask';
+      if (currentMode === 'diagnose') {
+        askEyebrow.textContent = '智能排查';
+        askTitle.textContent = '描述现象，自动排查';
+        askLead.textContent = '直接描述你看到的画面异常，知识库会优先匹配问题页、排查顺序和相关模块。';
+        askInputLabel.textContent = '画面现象';
+        askInput.placeholder = '例如：晚上画面很糊，车动起来有拖尾，暗的地方还一片灰';
+        askSubmit.textContent = '开始排查';
+        askEmptyText.textContent = '可以描述出现时间、画面区域、低照/运动/HDR/车灯等场景信息。';
+        return;
+      }
+
+      askEyebrow.textContent = '问答';
+      askTitle.textContent = '问知识库';
+      askLead.textContent = '输入平台、模块或现象，先检索知识库，再基于引用生成回答。';
+      askInputLabel.textContent = '问题';
+      askInput.placeholder = '例如：SC121AT HDR 高光过曝怎么排查';
+      askSubmit.textContent = '生成回答';
+      askEmptyText.textContent = '可以输入“平台 + 现象”或“模块 + 调试目标”。';
+    }
+
+    function normalize(value) {
+      return value
+        .toString()
+        .toLowerCase()
+        .replace(/[，。！？；：、（）【】《》“”‘’]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function unique(values) {
+      return [...new Set(values.filter(Boolean))];
+    }
+
+    function tokenize(value) {
+      const normalized = normalize(value);
+      const latin = normalized.match(/[a-z0-9_+#.-]{2,}/g) || [];
+      const chineseTerms = [];
+      for (const match of normalized.matchAll(/[\u4e00-\u9fff]{2,}/g)) {
+        const text = match[0];
+        if (text.length <= 8) chineseTerms.push(text);
+        for (const size of [2, 3, 4]) {
+          for (let index = 0; index <= text.length - size; index += 1) {
+            chineseTerms.push(text.slice(index, index + size));
+          }
+        }
+      }
+      return unique([...latin, ...chineseTerms]).filter((token) => token.length > 1);
+    }
+
+    function scoreChunk(query, chunk) {
+      const normalizedQuery = normalize(query);
+      const tokens = tokenize(query);
+      if (!tokens.length) return 0;
+
+      let score = 0;
+      const title = normalize(chunk.pageTitle);
+      const section = normalize(chunk.section);
+      const platform = normalize(chunk.platform);
+      const module = normalize(chunk.module);
+      const source = normalize(chunk.sourcePath);
+      const text = chunk.searchText || '';
+
+      if (normalizedQuery && text.includes(normalizedQuery)) score += 80;
+      if (normalizedQuery && title.includes(normalizedQuery)) score += 55;
+      if (normalizedQuery && section.includes(normalizedQuery)) score += 40;
+
+      for (const token of tokens) {
+        if (title.includes(token)) score += 18;
+        if (section.includes(token)) score += 14;
+        if (platform.includes(token)) score += 20;
+        if (module.includes(token)) score += 18;
+        if (source.includes(token)) score += 10;
+        if (text.includes(token)) score += 4;
+      }
+
+      for (const [kind, hints] of Object.entries(kindHints)) {
+        if (chunk.pageKind !== kind) continue;
+        if (hints.some((hint) => normalizedQuery.includes(hint))) score += 10;
+      }
+
+      if (currentMode === 'diagnose' && ['issues', 'workflows'].includes(chunk.pageKind)) score += 18;
+      if (chunk.pageKind === 'indexes') score -= 8;
+      return score;
+    }
+
+    function searchWiki(query) {
+      const ranked = ragChunks
+        .map((chunk) => ({ chunk, score: scoreChunk(query, chunk) }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+      const pageCounts = new Map();
+      const selected = [];
+      for (const item of ranked) {
+        const count = pageCounts.get(item.chunk.pageUrl) || 0;
+        if (count >= 2) continue;
+        selected.push(item);
+        pageCounts.set(item.chunk.pageUrl, count + 1);
+        if (selected.length >= 8) break;
+      }
+      return selected;
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function formatInline(value) {
+      return value
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+    }
+
+    function markdownishToHtml(value) {
+      const lines = escapeHtml(value || '').replace(/\r/g, '').split('\n');
+      const html = [];
+      let paragraph = [];
+      let listType = '';
+      let listItems = [];
+
+      const flushParagraph = () => {
+        if (!paragraph.length) return;
+        html.push(`<p>${paragraph.map(formatInline).join('<br>')}</p>`);
+        paragraph = [];
+      };
+
+      const flushList = () => {
+        if (!listItems.length || !listType) return;
+        html.push(`<${listType}>${listItems.map((item) => `<li>${item}</li>`).join('')}</${listType}>`);
+        listType = '';
+        listItems = [];
+      };
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) {
+          flushParagraph();
+          flushList();
+          continue;
+        }
+
+        const heading = line.match(/^(#{1,4})\s+(.+)$/);
+        if (heading) {
+          flushParagraph();
+          flushList();
+          html.push(`<h3>${formatInline(heading[2].trim())}</h3>`);
+          continue;
+        }
+
+        const plainHeading = line.match(/^(结论|可能问题|优先排查|排查顺序|原因分析|处理建议|需要补充观察|引用|下一步|注意事项)[：:]?$/);
+        if (plainHeading) {
+          flushParagraph();
+          flushList();
+          html.push(`<h3>${plainHeading[1]}</h3>`);
+          continue;
+        }
+
+        const citation = line.match(/^\[(\d+)\]\s+(.+)$/);
+        if (citation) {
+          flushParagraph();
+          if (listType !== 'ul') {
+            flushList();
+            listType = 'ul';
+          }
+          listItems.push(`<span class="citation-mark">[${citation[1]}]</span> ${formatInline(citation[2].trim())}`);
+          continue;
+        }
+
+        const unordered = line.match(/^[-*]\s+(.+)$/);
+        if (unordered) {
+          flushParagraph();
+          if (listType !== 'ul') {
+            flushList();
+            listType = 'ul';
+          }
+          listItems.push(formatInline(unordered[1].trim()));
+          continue;
+        }
+
+        const ordered = line.match(/^\d+[.、]\s+(.+)$/);
+        if (ordered) {
+          flushParagraph();
+          if (listType !== 'ol') {
+            flushList();
+            listType = 'ol';
+          }
+          listItems.push(formatInline(ordered[1].trim()));
+          continue;
+        }
+
+        flushList();
+        paragraph.push(line);
+      }
+
+      flushParagraph();
+      flushList();
+      return html.join('');
+    }
+
+    function makeSnippet(text, query) {
+      const tokens = tokenize(query);
+      const normalizedText = normalize(text);
+      let index = -1;
+      for (const token of tokens) {
+        index = normalizedText.indexOf(token);
+        if (index !== -1) break;
+      }
+
+      const start = index === -1 ? 0 : Math.max(0, index - 70);
+      const end = Math.min(text.length, start + 230);
+      return `${start > 0 ? '...' : ''}${text.slice(start, end).trim()}${end < text.length ? '...' : ''}`;
+    }
+
+    function getSelectedModel() {
+      return askModel?.value || defaultModel;
+    }
+
+    function renderAnswer(query, results) {
+      askEmpty.hidden = true;
+      askAnswer.hidden = false;
+
+      if (!results.length) {
+        askSummary.innerHTML = '<p>没有找到高相关片段。可以换成更具体的“平台 + 现象 + 模块”再试一次。</p>';
+        askResults.innerHTML = '';
+        lastContext = '';
+        return;
+      }
+
+      const top = results.slice(0, 4);
+      const platforms = unique(top.map((item) => item.chunk.platform).filter((value) => value && value !== '通用'));
+      const modules = unique(top.map((item) => item.chunk.module).filter(Boolean)).slice(0, 4);
+      const lead = top[0].chunk;
+
+      askSummary.innerHTML = `
+        <p>优先命中 <a href="${lead.pageUrl}">${escapeHtml(lead.pageTitle)}</a>${lead.section ? ` 的“${escapeHtml(lead.section)}”` : ''}。</p>
+        <ul>
+          ${platforms.length ? `<li>平台聚焦：${platforms.map(escapeHtml).join('、')}</li>` : ''}
+          ${modules.length ? `<li>相关模块：${modules.map(escapeHtml).join('、')}</li>` : ''}
+          <li>建议先打开前 3 条引用页，按页面里的排查顺序继续看。</li>
+        </ul>
+      `;
+
+      askResults.innerHTML = results.map(({ chunk, score }, index) => `
+        <article class="ask-result">
+          <div class="ask-result-rank">${index + 1}</div>
+          <div class="ask-result-body">
+            <div class="ask-result-meta">
+              <span>${escapeHtml(chunk.kindLabel)}</span>
+              <span>${escapeHtml(chunk.platform)}</span>
+              <span>${escapeHtml(chunk.module)}</span>
+              <em>${Math.round(score)}</em>
+            </div>
+            <h3><a href="${chunk.pageUrl}">${escapeHtml(chunk.pageTitle)}</a></h3>
+            ${chunk.section ? `<p class="ask-section">${escapeHtml(chunk.section)}</p>` : ''}
+            <p>${escapeHtml(makeSnippet(chunk.text, query))}</p>
+          </div>
+        </article>
+      `).join('');
+
+      lastContext = results.slice(0, 5).map(({ chunk }, index) => [
+        `引用 ${index + 1}: ${chunk.pageTitle}`,
+        `页面: ${chunk.pageUrl}`,
+        `章节: ${chunk.section || chunk.pageTitle}`,
+        `平台: ${chunk.platform}`,
+        `模块: ${chunk.module}`,
+        `内容: ${chunk.text}`,
+      ].join('\n')).join('\n\n');
+    }
+
+    function renderApiResponse(query, payload, fallbackResults) {
+      const citations = Array.isArray(payload.citations) ? payload.citations : [];
+      const modeLabel = payload.mode === 'llm'
+        ? `${payload.provider || 'LLM'} / ${payload.model || '模型回答'}`
+        : payload.mode === 'error'
+          ? '接口错误'
+          : '本地检索';
+
+      const results = citations.length
+        ? citations.map((item) => ({
+            score: item.score || 0,
+            chunk: {
+              pageTitle: item.pageTitle || '',
+              pageUrl: item.pageUrl || '#',
+              pageKind: item.pageKind || '',
+              kindLabel: item.kindLabel || '',
+              platform: item.platform || '',
+              module: item.module || '',
+              section: item.section || '',
+              sourcePath: item.sourcePath || '',
+              text: item.text || '',
+            },
+          }))
+        : fallbackResults;
+
+      renderAnswer(query, results);
+      askMode.textContent = modeLabel;
+      askModelAnswer.innerHTML = markdownishToHtml(payload.answer || payload.error || '没有生成可用回答。');
+      askModelAnswer.hidden = false;
+
+      if (payload.context) {
+        lastContext = payload.context;
+      }
+    }
+
+    async function runSearch(query, updateUrl = true) {
+      const cleanQuery = query.trim();
+      const selectedModel = getSelectedModel();
+      askInput.value = cleanQuery;
+
+      if (!cleanQuery) {
+        askAnswer.hidden = true;
+        askEmpty.hidden = false;
+        askMode.textContent = '回答';
+        askModelAnswer.innerHTML = '';
+        askModelAnswer.hidden = true;
+        askSummary.innerHTML = '';
+        askResults.innerHTML = '';
+        lastContext = '';
+        if (updateUrl) {
+          const params = new URLSearchParams();
+          if (selectedModel !== defaultModel) params.set('model', selectedModel);
+          if (currentMode === 'diagnose') params.set('mode', 'diagnose');
+          history.replaceState(null, '', `/ask/${params.toString() ? `?${params.toString()}` : ''}`);
+        }
+        return;
+      }
+
+      const fallbackResults = searchWiki(cleanQuery);
+      renderAnswer(cleanQuery, fallbackResults);
+      askMode.textContent = `${modelLabels[selectedModel] || selectedModel} / 生成中`;
+      askModelAnswer.hidden = false;
+      askModelAnswer.innerHTML = '<p>正在读取本地引用并生成回答...</p>';
+      askSubmit.disabled = true;
+      if (askModel) askModel.disabled = true;
+
+      try {
+        const response = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: cleanQuery, model: selectedModel, mode: currentMode }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || `接口请求失败：HTTP ${response.status}`);
+        }
+        renderApiResponse(cleanQuery, payload, fallbackResults);
+      } catch (error) {
+        askMode.textContent = '本地检索';
+        askModelAnswer.innerHTML = markdownishToHtml(`模型接口暂时不可用：${error.message || '未知错误'}\n\n下面先展示本地检索命中的引用。`);
+      } finally {
+        askSubmit.disabled = false;
+        if (askModel) askModel.disabled = false;
+      }
+
+      if (updateUrl) {
+        const params = new URLSearchParams({ q: cleanQuery, model: selectedModel });
+        if (currentMode === 'diagnose') params.set('mode', 'diagnose');
+        history.replaceState(null, '', `/ask/?${params.toString()}`);
+      }
+    }
+
+    askForm?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      runSearch(askInput.value);
+    });
+
+    clearAsk?.addEventListener('click', () => runSearch(''));
+
+    document.querySelectorAll('[data-example]').forEach((button) => {
+      button.addEventListener('click', () => runSearch(button.dataset.example || ''));
+    });
+
+    askModel?.addEventListener('change', () => {
+      const cleanQuery = askInput.value.trim();
+      if (cleanQuery) {
+        runSearch(cleanQuery);
+        return;
+      }
+      const selectedModel = getSelectedModel();
+      const params = new URLSearchParams();
+      if (selectedModel !== defaultModel) params.set('model', selectedModel);
+      if (currentMode === 'diagnose') params.set('mode', 'diagnose');
+      history.replaceState(null, '', `/ask/${params.toString() ? `?${params.toString()}` : ''}`);
+    });
+
+    copyContext?.addEventListener('click', async () => {
+      if (!lastContext) return;
+      try {
+        await navigator.clipboard.writeText(lastContext);
+        copyContext.textContent = '已复制';
+        window.setTimeout(() => {
+          copyContext.textContent = '复制上下文';
+        }, 1200);
+      } catch {
+        copyContext.textContent = '复制失败';
+      }
+    });
+
+    const initialParams = new URLSearchParams(window.location.search);
+    applyMode(initialParams.get('mode') || 'ask');
+    const initialModel = initialParams.get('model') || defaultModel;
+    if (askModel && modelOptions.some((option) => option.id === initialModel)) {
+      askModel.value = initialModel;
+    }
+    const initialQuery = initialParams.get('q') || '';
+    if (initialQuery) runSearch(initialQuery, false);
+  </script>
+</BaseLayout>

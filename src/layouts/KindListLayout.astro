@@ -1,0 +1,206 @@
+﻿---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getKnowledgePages, type KnowledgePage, type PageKind } from '../lib/content';
+import { getPageModuleName, getPagePlatform, groupPagesByPlatform, kindDescriptions, kindLabels, pagesForKind } from '../lib/taxonomy';
+
+interface Props {
+  kind: PageKind;
+}
+
+const { kind } = Astro.props;
+const pages = pagesForKind(getKnowledgePages(), kind);
+const platformGroups: Map<string, KnowledgePage[]> = kind === 'modules' ? groupPagesByPlatform(pages) : new Map();
+const platformEntries = [...platformGroups.entries()];
+const pageTitle = kindLabels[kind];
+---
+
+<BaseLayout title={pageTitle} description={kindDescriptions[kind]}>
+  <section class:list={['list-page', kind === 'issues' && 'issue-list-page']}>
+    <p class="eyebrow">{pageTitle}</p>
+    <h1>{pageTitle}</h1>
+    <p class="lead">{kindDescriptions[kind]}</p>
+
+    {pages.length ? (
+      kind === 'modules' ? (
+        <>
+          <div class="module-filter-panel" data-module-filter-root>
+            <label class="module-filter-input">
+              <span>筛选</span>
+              <input
+                id="moduleFilterInput"
+                type="search"
+                placeholder="输入平台、模块、标题或关键词"
+                autocomplete="off"
+              />
+            </label>
+            <div class="module-filter-footer">
+              <div class="module-platform-filter" aria-label="平台筛选">
+                <button class="module-filter-chip active" type="button" data-platform-filter="all" aria-pressed="true">
+                  全部
+                </button>
+                {platformEntries.map(([platform]) => (
+                  <button class="module-filter-chip" type="button" data-platform-filter={platform} aria-pressed="false">
+                    {platform}
+                  </button>
+                ))}
+              </div>
+              <p class="module-filter-meta" data-module-meta>{pages.length} 个功能模块</p>
+            </div>
+          </div>
+
+          <div class="platform-group-list">
+            {platformEntries.map(([platform, group]) => (
+              <details
+                class="platform-group"
+                data-module-group
+                data-platform={platform}
+                data-default-open="false"
+              >
+                <summary class="platform-group-header">
+                  <span class="platform-group-title-row">
+                    <span class="platform-group-toggle" aria-hidden="true"></span>
+                    <span class="platform-group-title">{platform}</span>
+                  </span>
+                  <span data-group-count>{group.length} 个功能模块</span>
+                </summary>
+                <div class="module-table" role="list">
+                  {group.map((page) => (
+                    <a
+                      class="module-row"
+                      href={page.url}
+                      role="listitem"
+                      data-module-row
+                      data-platform={platform}
+                      data-search={[
+                        platform,
+                        getPageModuleName(page),
+                        page.title,
+                        page.description,
+                        page.attributes['平台'],
+                        page.attributes['模块'],
+                      ].filter(Boolean).join(' ')}
+                    >
+                      <span class="module-name">{getPageModuleName(page)}</span>
+                      <span class="module-title">{page.title}</span>
+                      <span class="module-desc">{page.description || '进入模块页查看调试要点'}</span>
+                    </a>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+
+          <div class="module-empty-filter" data-module-empty hidden>
+            没有匹配的功能模块。
+          </div>
+        </>
+      ) : kind === 'issues' ? (
+        <div class="issue-tile-grid">
+          {pages.map((page) => (
+            <a class="issue-tile" href={page.url}>
+              <span class="issue-tile-platform">{getPagePlatform(page)}</span>
+              <strong>{page.title}</strong>
+              <small>{page.description || '进入问题页查看排查顺序'}</small>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div class="list-grid">
+          {pages.map((page) => (
+            <a class="content-card" href={page.url}>
+              <span>{getPagePlatform(page)}</span>
+              <h2>{page.title}</h2>
+              <p>{page.description || '进入页面查看详细内容'}</p>
+              {page.attributes['平台'] && <small>平台：{getPagePlatform(page)}</small>}
+              {page.attributes['模块'] && <small>模块：{getPageModuleName(page)}</small>}
+            </a>
+          ))}
+        </div>
+      )
+    ) : (
+      <div class="empty-state">
+        <h2>还没有内容</h2>
+        <p>当前还没有归入“{kindLabels[kind]}”的页面。</p>
+      </div>
+    )}
+  </section>
+
+  {kind === 'modules' && (
+    <script is:inline>
+      (() => {
+        const root = document.querySelector('[data-module-filter-root]');
+        if (!root) return;
+
+        const input = root.querySelector('#moduleFilterInput');
+        if (!input) return;
+
+        const chips = [...root.querySelectorAll('[data-platform-filter]')];
+        const groups = [...document.querySelectorAll('[data-module-group]')];
+        const meta = root.querySelector('[data-module-meta]');
+        const empty = document.querySelector('[data-module-empty]');
+        const rows = [...document.querySelectorAll('[data-module-row]')];
+        const total = rows.length;
+        let activePlatform = 'all';
+
+        const normalize = (value) => value.toString().trim().toLocaleLowerCase();
+
+        const applyFilter = () => {
+          const query = normalize(input.value || '');
+          const hasFilter = Boolean(query) || activePlatform !== 'all';
+          let visibleTotal = 0;
+
+          for (const group of groups) {
+            const groupRows = [...group.querySelectorAll('[data-module-row]')];
+            let visibleInGroup = 0;
+
+            for (const row of groupRows) {
+              const matchesPlatform = activePlatform === 'all' || row.dataset.platform === activePlatform;
+              const matchesText = !query || normalize(row.dataset.search || '').includes(query);
+              const visible = matchesPlatform && matchesText;
+              row.hidden = !visible;
+              if (visible) visibleInGroup += 1;
+            }
+
+            group.hidden = visibleInGroup === 0;
+            if (visibleInGroup > 0) {
+              group.open = hasFilter || group.dataset.defaultOpen === 'true';
+            }
+
+            const count = group.querySelector('[data-group-count]');
+            if (count) {
+              count.textContent = hasFilter
+                ? `${visibleInGroup} / ${groupRows.length} 个功能模块`
+                : `${groupRows.length} 个功能模块`;
+            }
+
+            visibleTotal += visibleInGroup;
+          }
+
+          for (const chip of chips) {
+            const active = chip.dataset.platformFilter === activePlatform;
+            chip.classList.toggle('active', active);
+            chip.setAttribute('aria-pressed', active ? 'true' : 'false');
+          }
+
+          if (meta) {
+            meta.textContent = hasFilter ? `${visibleTotal} / ${total} 个功能模块` : `${total} 个功能模块`;
+          }
+          if (empty) {
+            empty.hidden = visibleTotal !== 0;
+          }
+        };
+
+        for (const chip of chips) {
+          chip.addEventListener('click', () => {
+            activePlatform = chip.dataset.platformFilter || 'all';
+            applyFilter();
+          });
+        }
+
+        input.addEventListener('input', applyFilter);
+        applyFilter();
+      })();
+    </script>
+  )}
+</BaseLayout>
+

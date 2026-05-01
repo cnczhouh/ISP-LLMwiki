@@ -1,0 +1,733 @@
+---
+import '../styles/global.css';
+import { createRagChunks } from '../lib/rag';
+import { llmModelOptions, ttsModelOptions, unsupportedLlmModelOptions } from '../lib/llm';
+
+const ragChunks = createRagChunks();
+const modelOptions = llmModelOptions.map(({ id, label }) => ({ id, label }));
+const voiceModelOptions = ttsModelOptions.map(({ id, label }) => ({ id, label }));
+const disabledModelOptions = unsupportedLlmModelOptions.map(({ id, label }) => ({ id, label }));
+
+const commands = [
+  {
+    label: '问题排查',
+    prompt: '晚上画面很糊，车动起来还有拖尾，应该先查什么？',
+    mode: 'diagnose',
+  },
+  {
+    label: '学习路线',
+    prompt: '我要学习 SC121AT 的 HDR 调试路线，从哪里开始？',
+    mode: 'ask',
+  },
+  {
+    label: '查资料',
+    prompt: '帮我找 FH833X AE 亮度相关资料和入口。',
+    mode: 'ask',
+  },
+  {
+    label: '概念解释',
+    prompt: '拖影和降噪有什么关系？',
+    mode: 'diagnose',
+  },
+];
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="用对话方式查找、学习和排查 ISP 知识库" />
+    <script is:inline>
+      (() => {
+        let storedTheme = '';
+        try {
+          storedTheme = localStorage.getItem('isp-notes-theme') || '';
+        } catch {
+          storedTheme = '';
+        }
+        const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+        const theme = storedTheme || (systemDark ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <title>AllInAI · ISP 知识库</title>
+  </head>
+  <body class="allinai-body">
+  <section class="allinai-page allinai-standalone">
+    <nav class="allinai-topnav" aria-label="页面切换">
+      <a class="allinai-brand" href="/allinai/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <strong>AllInAI</strong>
+      </a>
+      <div>
+        <a class="outline-button" href="/traditional/">传统页面</a>
+        <a class="outline-button" href="/ask/">问知识库</a>
+      </div>
+    </nav>
+    <header class="allinai-hero">
+      <div>
+        <p class="home-eyebrow">AllInAI</p>
+        <h1>像命令行一样问知识库</h1>
+        <p>描述现象、输入平台、说学习目标，都可以直接开始。</p>
+      </div>
+      <div class="allinai-status" aria-label="AllInAI 状态">
+        <span>RAG</span>
+        <strong>{ragChunks.length}</strong>
+        <small>知识片段</small>
+      </div>
+    </header>
+
+    <section class="allinai-shell" aria-label="AllInAI 对话">
+      <div class="allinai-toolbar">
+        <div class="shell-dots" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <label class="allinai-model" for="allinaiModel">
+          <span>对话</span>
+          <select id="allinaiModel" name="model">
+            <optgroup label="可用模型">
+              {modelOptions.map((option) => (
+                <option value={option.id}>{option.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="暂不可用">
+              {disabledModelOptions.map((option) => (
+                <option value={option.id} disabled>{option.label}</option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
+        <label class="allinai-model voice-model" for="allinaiVoiceModel">
+          <span>语音</span>
+          <select id="allinaiVoiceModel" name="voiceModel">
+            {voiceModelOptions.map((option) => (
+              <option value={option.id}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div class="allinai-transcript" id="allinaiTranscript" aria-live="polite">
+        <article class="terminal-message system">
+          <span class="terminal-prefix">system</span>
+          <div>
+            <p>准备好了。你可以直接说“哪里不对劲”，也可以说“我要学哪个平台”。</p>
+          </div>
+        </article>
+      </div>
+
+      <div class="allinai-command-grid" aria-label="常用命令">
+        {commands.map((command) => (
+          <button type="button" data-prompt={command.prompt} data-mode={command.mode}>
+            <span>{command.label}</span>
+            <small>{command.prompt}</small>
+          </button>
+        ))}
+      </div>
+
+      <form class="allinai-prompt" id="allinaiForm">
+        <label for="allinaiInput">命令输入</label>
+        <div>
+          <span aria-hidden="true">&gt;</span>
+          <textarea id="allinaiInput" rows="2" placeholder="例如：SC121AT 低照亮度太低，还容易有噪声"></textarea>
+          <div class="prompt-actions">
+            <button class="voice-button prompt-voice" id="voiceButton" type="button" title="点击后开始语音输入">
+              语音对话
+              <span id="voiceState">点击说话</span>
+            </button>
+            <button class="button" id="allinaiSubmit" type="submit">运行</button>
+          </div>
+        </div>
+      </form>
+    </section>
+  </section>
+
+  <script is:inline define:vars={{ modelOptions, voiceModelOptions }}>
+    const form = document.getElementById('allinaiForm');
+    const input = document.getElementById('allinaiInput');
+    const submit = document.getElementById('allinaiSubmit');
+    const transcript = document.getElementById('allinaiTranscript');
+    const modelSelect = document.getElementById('allinaiModel');
+    const voiceModelSelect = document.getElementById('allinaiVoiceModel');
+    const voiceButton = document.getElementById('voiceButton');
+    const voiceState = document.getElementById('voiceState');
+    const defaultModel = modelOptions[0]?.id || 'mimo-v2.5';
+    const defaultVoiceModel = voiceModelOptions[0]?.id || 'mimo-v2.5-tts';
+    const modelLabels = Object.fromEntries(modelOptions.map((option) => [option.id, option.label]));
+    const voiceModelLabels = Object.fromEntries(voiceModelOptions.map((option) => [option.id, option.label]));
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    let listening = false;
+    let activeAudioUrl = '';
+    let activeAudio = null;
+    let hasNotifiedSpeechFallback = false;
+    let finalSpeechText = '';
+    let interimSpeechText = '';
+    let voiceSubmitTimer = 0;
+    let finishingSpeech = false;
+    const voiceAutoSubmitDelay = 2400;
+
+    const intentPresets = {
+      diagnose: {
+        text: '我遇到一个画面问题，帮我按现象排查。',
+        mode: 'diagnose',
+      },
+      learn: {
+        text: '我要学习一个目标平台的调试方法，请先给我学习路径。',
+        mode: 'ask',
+      },
+      lookup: {
+        text: '我要查资料，请告诉我应该看哪些页面和原始资料入口。',
+        mode: 'ask',
+      },
+      browse: {
+        text: '带我看看这个知识库里值得先看的内容。',
+        mode: 'ask',
+      },
+    };
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function formatInline(value) {
+      return value
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+    }
+
+    function answerToHtml(value) {
+      const lines = escapeHtml(value || '').replace(/\r/g, '').split('\n');
+      const html = [];
+      let paragraph = [];
+      let listType = '';
+      let listItems = [];
+
+      const flushParagraph = () => {
+        if (!paragraph.length) return;
+        html.push(`<p>${paragraph.map(formatInline).join('<br>')}</p>`);
+        paragraph = [];
+      };
+
+      const flushList = () => {
+        if (!listItems.length || !listType) return;
+        html.push(`<${listType}>${listItems.map((item) => `<li>${item}</li>`).join('')}</${listType}>`);
+        listType = '';
+        listItems = [];
+      };
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) {
+          flushParagraph();
+          flushList();
+          continue;
+        }
+
+        const heading = line.match(/^(#{1,4})\s+(.+)$/);
+        if (heading) {
+          flushParagraph();
+          flushList();
+          html.push(`<h3>${formatInline(heading[2].trim())}</h3>`);
+          continue;
+        }
+
+        const plainHeading = line.match(/^(结论|可能问题|优先排查|排查顺序|需要补充观察|引用|学习路线|资料入口|下一步|注意事项)[：:]?$/);
+        if (plainHeading) {
+          flushParagraph();
+          flushList();
+          html.push(`<h3>${plainHeading[1]}</h3>`);
+          continue;
+        }
+
+        const citation = line.match(/^\[(\d+)\]\s+(.+)$/);
+        if (citation) {
+          flushParagraph();
+          if (listType !== 'ul') {
+            flushList();
+            listType = 'ul';
+          }
+          listItems.push(`<span class="citation-mark">[${citation[1]}]</span> ${formatInline(citation[2].trim())}`);
+          continue;
+        }
+
+        const unordered = line.match(/^[-*]\s+(.+)$/);
+        if (unordered) {
+          flushParagraph();
+          if (listType !== 'ul') {
+            flushList();
+            listType = 'ul';
+          }
+          listItems.push(formatInline(unordered[1].trim()));
+          continue;
+        }
+
+        const ordered = line.match(/^\d+[.、]\s+(.+)$/);
+        if (ordered) {
+          flushParagraph();
+          if (listType !== 'ol') {
+            flushList();
+            listType = 'ol';
+          }
+          listItems.push(formatInline(ordered[1].trim()));
+          continue;
+        }
+
+        flushList();
+        paragraph.push(line);
+      }
+
+      flushParagraph();
+      flushList();
+      return html.join('');
+    }
+
+    function detectMode(text, forcedMode) {
+      if (forcedMode === 'diagnose') return 'diagnose';
+      const normalized = text.toLowerCase();
+      const issueWords = [
+        '偏色',
+        '噪声',
+        '拖影',
+        '闪烁',
+        '过曝',
+        '发灰',
+        '发白',
+        '太暗',
+        '太亮',
+        '涂抹',
+        '假边',
+        '不自然',
+        '怎么调',
+        '排查',
+        '问题',
+        '异常',
+      ];
+      return issueWords.some((word) => normalized.includes(word)) ? 'diagnose' : 'ask';
+    }
+
+    function getSelectedModel() {
+      return modelSelect?.value || defaultModel;
+    }
+
+    function getSelectedVoiceModel() {
+      return voiceModelSelect?.value || defaultVoiceModel;
+    }
+
+    function appendMessage(role, html, meta = '') {
+      if (!transcript) return undefined;
+      const article = document.createElement('article');
+      article.className = `terminal-message ${role}`;
+      article.innerHTML = `
+        <span class="terminal-prefix">${escapeHtml(role)}</span>
+        <div>
+          ${meta ? `<small>${escapeHtml(meta)}</small>` : ''}
+          ${html}
+        </div>
+      `;
+      transcript.append(article);
+      transcript.scrollTop = transcript.scrollHeight;
+      return article;
+    }
+
+    function renderCitations(citations) {
+      if (!Array.isArray(citations) || citations.length === 0) {
+        return '<p class="allinai-muted">没有命中可展示的引用。</p>';
+      }
+
+      const top = citations.slice(0, 5);
+      return `
+        <div class="allinai-citations">
+          ${top.map((item, index) => `
+            <a href="${escapeHtml(item.pageUrl || '#')}">
+              <span>${index + 1}</span>
+              <strong>${escapeHtml(item.pageTitle || '知识库页面')}</strong>
+              <small>${escapeHtml([item.kindLabel, item.platform, item.module].filter(Boolean).join(' / '))}</small>
+            </a>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function setBusy(isBusy) {
+      if (submit) {
+        submit.disabled = isBusy;
+        submit.textContent = isBusy ? '运行中' : '运行';
+      }
+      if (modelSelect) modelSelect.disabled = isBusy;
+      if (voiceModelSelect) voiceModelSelect.disabled = isBusy;
+      if (voiceButton) voiceButton.disabled = isBusy && !listening;
+    }
+
+    function textForSpeech(value) {
+      return String(value || '')
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/^\s*[-*]\s+/gm, '')
+        .replace(/^\s*\d+[.、]\s+/gm, '')
+        .replace(/\[(\d+)\]/g, '引用$1')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 1500);
+    }
+
+    function setVoiceStatus(text, active = false) {
+      if (!voiceState) return;
+      voiceState.textContent = text;
+      voiceButton?.classList.toggle('listening', active);
+    }
+
+    function clearVoiceSubmitTimer() {
+      if (!voiceSubmitTimer) return;
+      window.clearTimeout(voiceSubmitTimer);
+      voiceSubmitTimer = 0;
+    }
+
+    function resetVoiceDraft() {
+      finalSpeechText = '';
+      interimSpeechText = '';
+      clearVoiceSubmitTimer();
+    }
+
+    function scheduleVoiceSubmit(delay = voiceAutoSubmitDelay) {
+      const draft = (finalSpeechText || input.value || '').trim();
+      if (!draft) return;
+      clearVoiceSubmitTimer();
+      setVoiceStatus('停顿后发送', true);
+      voiceSubmitTimer = window.setTimeout(() => {
+        finishVoiceInput();
+      }, delay);
+    }
+
+    function finishVoiceInput() {
+      const spokenText = (input.value || [finalSpeechText, interimSpeechText].filter(Boolean).join(' ')).trim();
+      if (!spokenText) {
+        resetVoiceDraft();
+        if (recognition && listening) recognition.stop();
+        setVoiceStatus('点击说话');
+        return;
+      }
+
+      finishingSpeech = true;
+      clearVoiceSubmitTimer();
+      if (recognition && listening) {
+        try {
+          recognition.stop();
+        } catch {
+          listening = false;
+        }
+      }
+      resetVoiceDraft();
+      setVoiceStatus('发送中');
+      runAllInAI(spokenText, '', true);
+    }
+
+    function stopSpeechPlayback() {
+      if (activeAudio) {
+        activeAudio.pause();
+        activeAudio.removeAttribute('src');
+        activeAudio = null;
+      }
+      if (activeAudioUrl) {
+        URL.revokeObjectURL(activeAudioUrl);
+        activeAudioUrl = '';
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    }
+
+    function browserSpeechAvailable() {
+      return 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+    }
+
+    function pickBrowserVoice() {
+      const voices = window.speechSynthesis?.getVoices?.() || [];
+      return voices.find((item) => item.lang?.toLowerCase().startsWith('zh-cn'))
+        || voices.find((item) => item.lang?.toLowerCase().startsWith('zh'))
+        || voices[0]
+        || null;
+    }
+
+    function speakWithBrowser(text) {
+      return new Promise((resolve, reject) => {
+        if (!browserSpeechAvailable()) {
+          reject(new Error('当前浏览器不支持本地朗读。'));
+          return;
+        }
+
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 1;
+        utterance.pitch = 1;
+
+        const assignVoice = () => {
+          const voice = pickBrowserVoice();
+          if (voice) utterance.voice = voice;
+        };
+        assignVoice();
+        if (!window.speechSynthesis.getVoices().length) {
+          window.speechSynthesis.onvoiceschanged = assignVoice;
+        }
+
+        utterance.onend = () => {
+          setVoiceStatus('点击说话');
+          resolve();
+        };
+        utterance.onerror = (event) => {
+          setVoiceStatus('语音失败');
+          reject(new Error(event.error || '浏览器本地朗读失败。'));
+        };
+
+        setVoiceStatus('本地朗读');
+        window.speechSynthesis.speak(utterance);
+      });
+    }
+
+    async function speakAnswer(text) {
+      const speechText = textForSpeech(text);
+      if (!speechText) return;
+      stopSpeechPlayback();
+
+      try {
+        setVoiceStatus('合成中');
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: speechText,
+            model: getSelectedVoiceModel(),
+          }),
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || `语音合成失败：HTTP ${response.status}`);
+        }
+
+        if (activeAudioUrl) {
+          URL.revokeObjectURL(activeAudioUrl);
+          activeAudioUrl = '';
+        }
+
+        const blob = await response.blob();
+        activeAudioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(activeAudioUrl);
+        activeAudio = audio;
+        audio.addEventListener('ended', () => setVoiceStatus('点击说话'));
+        audio.addEventListener('error', () => setVoiceStatus('播放失败'));
+        await audio.play();
+        setVoiceStatus(voiceModelLabels[getSelectedVoiceModel()] || '播放中');
+      } catch (error) {
+        const cloudMessage = error.message || '未知错误';
+        try {
+          await speakWithBrowser(speechText);
+          if (!hasNotifiedSpeechFallback) {
+            appendMessage('system', `<p>云端语音不可用，已切换为浏览器本地朗读。</p><small>${escapeHtml(cloudMessage)}</small>`);
+            hasNotifiedSpeechFallback = true;
+          }
+        } catch (localError) {
+          setVoiceStatus('语音失败');
+          appendMessage('system', `<p>语音播放失败：${escapeHtml(cloudMessage)}</p><small>${escapeHtml(localError.message || '本地朗读也不可用')}</small>`);
+        }
+      }
+    }
+
+    async function runAllInAI(question, forcedMode = '', speak = false) {
+      const cleanQuestion = question.trim();
+      if (!cleanQuestion) return;
+
+      const mode = detectMode(cleanQuestion, forcedMode);
+      const selectedModel = getSelectedModel();
+      input.value = '';
+      appendMessage('user', `<p><code>&gt;</code> ${escapeHtml(cleanQuestion)}</p>`, mode === 'diagnose' ? '现象排查' : '知识库问答');
+      const pending = appendMessage(
+        'ai',
+        '<p class="terminal-cursor">正在检索知识库并生成回答</p>',
+        modelLabels[selectedModel] || selectedModel,
+      );
+      setBusy(true);
+
+      try {
+        const response = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: cleanQuestion, model: selectedModel, mode }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || `请求失败：HTTP ${response.status}`);
+        }
+
+        pending.innerHTML = `
+          <span class="terminal-prefix">ai</span>
+          <div>
+            <small>${escapeHtml(payload.provider || modelLabels[selectedModel] || selectedModel)}</small>
+            <div class="allinai-answer">${answerToHtml(payload.answer || '没有生成可用回答。')}</div>
+            ${renderCitations(payload.citations)}
+          </div>
+        `;
+        if (speak) {
+          await speakAnswer(payload.answer || '');
+        }
+      } catch (error) {
+        pending.innerHTML = `
+          <span class="terminal-prefix">ai</span>
+          <div>
+            <small>本地检索</small>
+            <p>模型接口暂时不可用：${escapeHtml(error.message || '未知错误')}</p>
+          </div>
+        `;
+      } finally {
+        setBusy(false);
+        transcript.scrollTop = transcript.scrollHeight;
+        if (!speak) setVoiceStatus('点击说话');
+      }
+    }
+
+    function setupSpeechRecognition() {
+      if (!SpeechRecognition) {
+        voiceButton.disabled = true;
+        setVoiceStatus('浏览器不支持');
+        voiceButton.title = '当前浏览器不支持 SpeechRecognition，可继续使用文字输入。';
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.lang = 'zh-CN';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        listening = true;
+        finishingSpeech = false;
+        resetVoiceDraft();
+        setVoiceStatus('正在听', true);
+      };
+
+      recognition.onresult = (event) => {
+        let interim = '';
+        let finalText = '';
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          const transcriptText = event.results[index][0]?.transcript || '';
+          if (event.results[index].isFinal) {
+            finalText += `${transcriptText} `;
+          } else {
+            interim += transcriptText;
+          }
+        }
+        if (finalText.trim()) {
+          finalSpeechText = `${finalSpeechText} ${finalText}`.replace(/\s+/g, ' ').trim();
+        }
+        interimSpeechText = interim.trim();
+        input.value = [finalSpeechText, interimSpeechText].filter(Boolean).join(' ').trim();
+        if (finalSpeechText) {
+          scheduleVoiceSubmit();
+        } else {
+          setVoiceStatus('正在听', true);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        listening = false;
+        const message = event.error === 'not-allowed'
+          ? '麦克风未授权'
+          : event.error === 'no-speech'
+            ? '没听清'
+            : '听写失败';
+        setVoiceStatus(message);
+      };
+
+      recognition.onend = () => {
+        listening = false;
+        voiceButton?.classList.remove('listening');
+        if (finishingSpeech) {
+          finishingSpeech = false;
+          return;
+        }
+        if (voiceSubmitTimer) {
+          setVoiceStatus('停顿后发送', true);
+          return;
+        }
+        if ((input.value || finalSpeechText).trim()) {
+          scheduleVoiceSubmit(600);
+          return;
+        }
+        if (voiceState?.textContent === '正在听') {
+          setVoiceStatus('点击说话');
+        }
+      };
+    }
+
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      runAllInAI(input.value);
+    });
+
+    document.querySelectorAll('[data-prompt]').forEach((button) => {
+      button.addEventListener('click', () => {
+        runAllInAI(button.dataset.prompt || '', button.dataset.mode || '');
+      });
+    });
+
+    voiceButton?.addEventListener('click', () => {
+      if (!recognition) return;
+      if (listening) {
+        if ((input.value || finalSpeechText).trim()) {
+          finishVoiceInput();
+        } else {
+          resetVoiceDraft();
+          recognition.stop();
+          setVoiceStatus('点击说话');
+        }
+        return;
+      }
+      stopSpeechPlayback();
+      try {
+        recognition.start();
+      } catch {
+        setVoiceStatus('正在听', true);
+      }
+    });
+
+    input?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        runAllInAI(input.value);
+      }
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const initialModel = params.get('model') || defaultModel;
+    if (modelSelect && modelOptions.some((option) => option.id === initialModel)) {
+      modelSelect.value = initialModel;
+    }
+    const initialVoiceModel = params.get('voiceModel') || defaultVoiceModel;
+    if (voiceModelSelect && voiceModelOptions.some((option) => option.id === initialVoiceModel)) {
+      voiceModelSelect.value = initialVoiceModel;
+    }
+
+    const initialQuery = params.get('q') || '';
+    const intent = params.get('intent');
+    if (initialQuery) {
+      input.value = initialQuery;
+      input.focus();
+    } else if (intentPresets[intent]) {
+      input.value = intentPresets[intent].text;
+      input.focus();
+    }
+    setupSpeechRecognition();
+  </script>
+  </body>
+</html>

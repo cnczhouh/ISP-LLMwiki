@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.astro/
+.vite-cache/
+dist-check-ui/
+.astro-dev.*.log
+public/assets/isp-tuning-workstation.png
+.env
+.env.local
