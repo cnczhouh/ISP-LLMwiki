@@ -45,7 +45,13 @@ export interface RawAsset {
 }
 
 const configuredRoot = process.env.KNOWLEDGE_ROOT?.trim();
-const rootDir = configuredRoot ? path.resolve(configuredRoot) : path.resolve(process.cwd(), '..', 'Own');
+const bundledRoot = path.resolve(process.cwd(), 'knowledge');
+const siblingRoot = path.resolve(process.cwd(), '..', 'Own');
+const rootDir = configuredRoot
+  ? path.resolve(configuredRoot)
+  : fs.existsSync(path.join(bundledRoot, 'wiki'))
+    ? bundledRoot
+    : siblingRoot;
 const wikiDir = path.join(rootDir, 'wiki');
 const logsDir = path.join(rootDir, 'logs');
 const rawDir = path.join(rootDir, 'raw');

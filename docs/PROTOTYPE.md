@@ -49,7 +49,7 @@
 
 ```mermaid
 flowchart LR
-  A["Markdown 知识库"] --> B["内容读取 content.ts"]
+  A["knowledge Markdown 知识库"] --> B["内容读取 content.ts"]
   B --> C["分类与页面属性 taxonomy.ts"]
   B --> D["本地 RAG 检索 ragSearch.ts"]
   C --> E["传统页面 /knowledge 与分类列表"]
@@ -79,7 +79,7 @@ flowchart LR
 当前原型优先解决“个人知识库本地使用”和“GitHub 展示结构”的问题，因此有几个边界：
 
 - 不内置用户密钥，所有密钥通过环境变量配置。
-- 不把原始资料默认打包进 Web 项目，使用 `KNOWLEDGE_ROOT` 指向知识库。
+- Web 项目内置 `knowledge/` 目录；真实原始资料仍默认排除，只提交 `raw/README.md`。
 - 不替代人工判断，模型回答应回到引用页核对。
 - 不把一次项目经验直接上升为通用规律，案例必须保留上下文。
 

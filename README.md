@@ -39,16 +39,21 @@ Own-web/
       taxonomy.ts            # 分类与页面属性
     layouts/
     styles/
+  knowledge/
+    wiki/                    # 知识库正文
+    schema/                  # 知识库规则和模板
+    logs/                    # 维护日志
+    raw/README.md            # raw 目录说明，真实 raw 文件默认不上传
   public/
   docs/
     PROTOTYPE.md
     KNOWLEDGE_BASE_RULES.md
 ```
 
-知识库内容默认放在另一个目录，通过 `KNOWLEDGE_ROOT` 指向：
+仓库内置一个 `knowledge/` 目录，Web 默认读取这里的知识库内容。也可以通过 `KNOWLEDGE_ROOT` 指向外部私有知识库：
 
 ```text
-Own/
+knowledge/
   raw/                       # 原始资料
   wiki/
     modules/
@@ -82,7 +87,7 @@ http://127.0.0.1:4321/
 复制 `.env.example` 为 `.env.local`，按需填写：
 
 ```bash
-KNOWLEDGE_ROOT=E:\mylife\libiary\Own
+KNOWLEDGE_ROOT=./knowledge
 ```
 
 ### 大模型问答
@@ -135,8 +140,8 @@ npm run preview
 
 - 不上传 `.env`、`.env.local`、`node_modules/`、`dist/`、`.astro/`。
 - 原始 PDF、公司资料、项目记录可能包含版权或保密信息，上传前先确认是否可以公开。
-- 如果公开仓库只展示原型，可保留少量脱敏示例 Markdown，不直接上传完整 `raw/`。
-- `KNOWLEDGE_ROOT` 使用本地路径配置，不要把个人绝对路径写死在代码里。
+- 本仓库默认只提交 `knowledge/raw/README.md`，不提交真实 raw 文件。
+- `KNOWLEDGE_ROOT` 可使用本地路径覆盖，但不要把个人绝对路径写死在代码里。
 
 ## 文档
 

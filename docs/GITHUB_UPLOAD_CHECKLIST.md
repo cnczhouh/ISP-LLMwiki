@@ -15,6 +15,11 @@ Own-web/
   src/
   public/
   docs/
+  knowledge/
+    wiki/
+    schema/
+    logs/
+    raw/README.md
   .env.example
   .gitignore
   astro.config.mjs
@@ -26,10 +31,10 @@ Own-web/
 
 ## 可选公开内容
 
-如果你希望展示知识库结构，可以放一个脱敏示例知识库：
+如果你希望展示知识库结构，可以放一个脱敏示例知识库，或使用当前仓库的 `knowledge/` 目录：
 
 ```text
-example-knowledge/
+knowledge/
   raw/
     README.md
   wiki/
@@ -44,7 +49,7 @@ example-knowledge/
     README.md
 ```
 
-然后在 `.env.local` 中指向真实知识库：
+然后在 `.env.local` 中可以指向真实私有知识库，也可以直接使用仓库内置 `knowledge/`：
 
 ```bash
 KNOWLEDGE_ROOT=E:\your\private\knowledge
@@ -53,7 +58,7 @@ KNOWLEDGE_ROOT=E:\your\private\knowledge
 公开仓库中的 `.env.example` 只保留示例：
 
 ```bash
-KNOWLEDGE_ROOT=../Own
+KNOWLEDGE_ROOT=./knowledge
 ```
 
 ## 首次上传命令参考

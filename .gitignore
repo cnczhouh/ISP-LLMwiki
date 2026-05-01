@@ -7,3 +7,8 @@ dist-check-ui/
 public/assets/isp-tuning-workstation.png
 .env
 .env.local
+
+# Keep the public knowledge structure, but do not commit private raw source files.
+knowledge/raw/*
+!knowledge/raw/
+!knowledge/raw/README.md
