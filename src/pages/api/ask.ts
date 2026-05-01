@@ -2,11 +2,16 @@ import type { APIRoute } from 'astro';
 import { generateLlmAnswer, getLlmConfig, isLlmConfigured, isUnsupportedLlmModel } from '../../lib/llm';
 import { buildModelContext, searchRagChunks } from '../../lib/ragSearch';
 
-export const prerender = false;
-
 const requestWindowMs = 60_000;
 const maxRequestsPerWindow = 12;
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+
+export const GET: APIRoute = () => json({
+  ok: false,
+  mode: 'static',
+  configured: false,
+  error: '静态部署不包含服务端问答接口。请使用页面内本地检索，或切换到 server 模式启用 AI 问答。',
+});
 
 export const POST: APIRoute = async ({ request }) => {
   let modelId: string | undefined;

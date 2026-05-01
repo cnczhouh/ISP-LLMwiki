@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getKnowledgePages } from '../lib/content';
+import { withBase } from '../lib/sitePaths';
 import { getPagePlatform, kindLabels, pagesForKind } from '../lib/taxonomy';
 
 const pages = getKnowledgePages();
@@ -73,7 +74,7 @@ const intentCards = [
     <section class="intent-grid" aria-label="首页入口">
       {intentCards.map((entry) => (
         <article class="intent-card">
-          <a class="intent-main-link" href={entry.href}>
+          <a class="intent-main-link" href={withBase(entry.href)}>
             <span class="intent-mark" aria-hidden="true"></span>
             <span class="intent-copy">
               <strong>{entry.title}</strong>
@@ -82,9 +83,9 @@ const intentCards = [
             <em>{entry.meta}</em>
           </a>
           <div class="intent-actions">
-            <a class="button" href={entry.href}>{entry.action}</a>
+            <a class="button" href={withBase(entry.href)}>{entry.action}</a>
             {entry.subActions.map((item) => (
-              <a class="outline-button" href={item.href}>{item.label}</a>
+              <a class="outline-button" href={withBase(item.href)}>{item.label}</a>
             ))}
           </div>
         </article>
@@ -97,7 +98,7 @@ const intentCards = [
           <span>学习</span>
           <h2>选择目标平台</h2>
         </div>
-        <a href="/platforms/">全部平台</a>
+        <a href={withBase('/platforms/')}>全部平台</a>
       </div>
       <div class="intent-platform-list">
         {platformPages.map((page) => (
@@ -138,10 +139,10 @@ const intentCards = [
           </div>
         </div>
         <div class="intent-mini-stats">
-          <a href="/issues/"><strong>{issuePages.length}</strong><span>问题</span></a>
-          <a href="/modules/"><strong>{modulePages.length}</strong><span>模块</span></a>
-          <a href="/workflows/"><strong>{workflowPages.length}</strong><span>流程</span></a>
-          <a href="/platforms/"><strong>{platformPages.length}</strong><span>平台</span></a>
+          <a href={withBase('/issues/')}><strong>{issuePages.length}</strong><span>问题</span></a>
+          <a href={withBase('/modules/')}><strong>{modulePages.length}</strong><span>模块</span></a>
+          <a href={withBase('/workflows/')}><strong>{workflowPages.length}</strong><span>流程</span></a>
+          <a href={withBase('/platforms/')}><strong>{platformPages.length}</strong><span>平台</span></a>
         </div>
       </section>
     </section>

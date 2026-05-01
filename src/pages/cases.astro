@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { withBase } from '../lib/sitePaths';
 ---
 
 <BaseLayout title="调试案例已合并" description="调试案例已合并到问题排查页">
@@ -11,7 +12,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <div class="empty-state">
       <h2>推荐入口</h2>
       <p>从问题现象进入，再在问题页中查看“调试案例 / 项目记录 / 可复用经验”。</p>
-      <a class="button" href="/issues/">进入问题排查</a>
+      <a class="button" href={withBase('/issues/')}>进入问题排查</a>
     </div>
   </section>
 </BaseLayout>

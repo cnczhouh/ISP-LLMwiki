@@ -2,6 +2,7 @@
 import BaseLayout from './BaseLayout.astro';
 import type { KnowledgePage } from '../lib/content';
 import { resolveRawAsset } from '../lib/content';
+import { withBase } from '../lib/sitePaths';
 import { kindLabels } from '../lib/taxonomy';
 
 interface Props {
@@ -24,9 +25,9 @@ function sourceLabel(label: string): string {
 <BaseLayout title={page.title} description={page.description}>
   <article class="knowledge-page">
     <nav class="breadcrumb" aria-label="面包屑">
-      <a href="/traditional/">传统页面</a>
+      <a href={withBase('/traditional/')}>传统页面</a>
       <span>/</span>
-      <a href={`/${page.kind}/`}>{kindLabels[page.kind]}</a>
+      <a href={withBase(`/${page.kind}/`)}>{kindLabels[page.kind]}</a>
     </nav>
 
     <header class="article-header">

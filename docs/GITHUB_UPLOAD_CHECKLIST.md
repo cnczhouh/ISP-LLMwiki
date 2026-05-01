@@ -7,6 +7,7 @@
 - 确认 `node_modules/`、`dist/`、`.astro/` 不上传。
 - 确认 `raw/` 中的 PDF、datasheet、客户项目资料、厂商文档是否允许公开。
 - 若只想公开原型，建议使用少量脱敏 Markdown 示例代替完整知识库。
+- 运行 `npm run lint:knowledge`，检查页面属性、来源、双向链接和命名规范。
 
 ## 推荐公开内容
 
@@ -15,6 +16,7 @@ Own-web/
   src/
   public/
   docs/
+  examples/static-knowledge/
   knowledge/
     wiki/
     schema/
@@ -60,6 +62,22 @@ KNOWLEDGE_ROOT=E:\your\private\knowledge
 ```bash
 KNOWLEDGE_ROOT=./knowledge
 ```
+
+## 静态部署检查
+
+GitHub Pages 推荐使用静态构建：
+
+```bash
+npm run build:static
+```
+
+如果只想发布脱敏演示内容：
+
+```bash
+npm run build:static:example
+```
+
+部署说明见 `docs/STATIC_DEPLOYMENT.md`。
 
 ## 首次上传命令参考
 

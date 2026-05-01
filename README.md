@@ -131,10 +131,33 @@ MIMO_TTS_MODEL=mimo-v2.5-tts
 ## 构建与检查
 
 ```bash
+npm run lint:knowledge
 npm run check
 npm run build
 npm run preview
 ```
+
+`npm run lint:knowledge` 会检查知识库页面属性、来源引用、双向链接和命名规范。默认只有错误会让命令失败；需要把警告也作为失败时可以运行：
+
+```bash
+npm run lint:knowledge -- --strict
+```
+
+## 静态部署
+
+GitHub Pages / 静态部署模式适合公开展示知识库页面，不包含服务端问答和云端 TTS 接口。
+
+```bash
+npm run build:static
+```
+
+仓库还提供一个脱敏的最小示例知识库：
+
+```bash
+npm run build:static:example
+```
+
+示例内容位于 `examples/static-knowledge/`，部署说明见 [docs/STATIC_DEPLOYMENT.md](docs/STATIC_DEPLOYMENT.md)。
 
 ## GitHub 上传前建议
 
@@ -147,3 +170,4 @@ npm run preview
 
 - [docs/PROTOTYPE.md](docs/PROTOTYPE.md)：产品原型、功能模块和页面流程。
 - [docs/KNOWLEDGE_BASE_RULES.md](docs/KNOWLEDGE_BASE_RULES.md)：知识库目录、页面角色、入库规则和命名原则。
+- [docs/STATIC_DEPLOYMENT.md](docs/STATIC_DEPLOYMENT.md)：GitHub Pages、静态构建和示例知识库说明。

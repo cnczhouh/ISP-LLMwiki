@@ -2,11 +2,13 @@
 import '../styles/global.css';
 import { createRagChunks } from '../lib/rag';
 import { llmModelOptions, ttsModelOptions, unsupportedLlmModelOptions } from '../lib/llm';
+import { withBase } from '../lib/sitePaths';
 
 const ragChunks = createRagChunks();
 const modelOptions = llmModelOptions.map(({ id, label }) => ({ id, label }));
 const voiceModelOptions = ttsModelOptions.map(({ id, label }) => ({ id, label }));
 const disabledModelOptions = unsupportedLlmModelOptions.map(({ id, label }) => ({ id, label }));
+const baseUrl = import.meta.env.BASE_URL || '/';
 
 const commands = [
   {
@@ -56,13 +58,13 @@ const commands = [
   <body class="allinai-body">
   <section class="allinai-page allinai-standalone">
     <nav class="allinai-topnav" aria-label="页面切换">
-      <a class="allinai-brand" href="/allinai/">
+      <a class="allinai-brand" href={withBase('/allinai/')}>
         <span class="brand-mark" aria-hidden="true"></span>
         <strong>AllInAI</strong>
       </a>
       <div>
-        <a class="outline-button" href="/traditional/">传统页面</a>
-        <a class="outline-button" href="/ask/">问知识库</a>
+        <a class="outline-button" href={withBase('/traditional/')}>传统页面</a>
+        <a class="outline-button" href={withBase('/ask/')}>问知识库</a>
       </div>
     </nav>
     <header class="allinai-hero">
@@ -145,7 +147,7 @@ const commands = [
     </section>
   </section>
 
-  <script is:inline define:vars={{ modelOptions, voiceModelOptions }}>
+  <script is:inline define:vars={{ modelOptions, voiceModelOptions, baseUrl }}>
     const form = document.getElementById('allinaiForm');
     const input = document.getElementById('allinaiInput');
     const submit = document.getElementById('allinaiSubmit');
@@ -169,6 +171,12 @@ const commands = [
     let voiceSubmitTimer = 0;
     let finishingSpeech = false;
     const voiceAutoSubmitDelay = 2400;
+
+    function sitePath(path) {
+      const cleanBase = (baseUrl || '/').replace(/\/$/, '');
+      const cleanPath = String(path || '').replace(/^\/+/, '');
+      return `${cleanBase || ''}/${cleanPath}`;
+    }
 
     const intentPresets = {
       diagnose: {
@@ -502,7 +510,7 @@ const commands = [
 
       try {
         setVoiceStatus('合成中');
-        const response = await fetch('/api/tts', {
+        const response = await fetch(sitePath('/api/tts'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -560,7 +568,7 @@ const commands = [
       setBusy(true);
 
       try {
-        const response = await fetch('/api/ask', {
+        const response = await fetch(sitePath('/api/ask'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ question: cleanQuestion, model: selectedModel, mode }),

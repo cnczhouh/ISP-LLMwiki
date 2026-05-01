@@ -231,7 +231,51 @@ GW5_ISP_Tuning_LTM.pdf
 - 结论不要脱离适用范围。
 - 索引页只负责导航，不承载大量细节结论。
 
-## 10. GitHub 公开注意事项
+## 10. 知识库 Lint
+
+项目内置知识库 Lint，用来在上传或重构前检查页面一致性：
+
+```bash
+npm run lint:knowledge
+```
+
+默认检查：
+
+- 页面属性：是否存在 `## 页面属性` 或 `## 平台属性`，以及类型、平台、模块、场景、适用范围等字段。
+- 来源：正式 wiki 页面是否有 `## 来源`、`## 已有原始资料`、`## 资料来源` 或 `## 参考资料`，并保留 `raw/` 引用。
+- 链接：检查 `[[...]]` 是否能解析到页面，提示孤立页面和建议补充的双向链接。
+- 命名：检查 wiki 目录、重复标题、文件名空格和不推荐字符。
+
+如果希望警告也阻止通过：
+
+```bash
+npm run lint:knowledge -- --strict
+```
+
+如果要检查外部知识库：
+
+```bash
+npm run lint:knowledge -- --root E:\mylife\libiary\Own
+```
+
+## 11. GitHub Pages / 静态部署示例
+
+静态部署用于公开展示知识库，不包含服务端 `/api/ask`、`/api/tts` 和私有密钥。仓库提供一个脱敏示例知识库：
+
+```text
+examples/static-knowledge/
+```
+
+构建命令：
+
+```bash
+npm run build:static
+npm run build:static:example
+```
+
+详细说明见 [docs/STATIC_DEPLOYMENT.md](STATIC_DEPLOYMENT.md)。
+
+## 12. GitHub 公开注意事项
 
 - 不上传密钥、 `.env`、`.env.local`。
 - 不上传无权公开的 PDF、datasheet、客户项目记录或厂商保密资料。

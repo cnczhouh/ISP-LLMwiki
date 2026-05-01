@@ -1,1 +1,22 @@
-{"scripts":{"dev":"astro dev","build":"astro build","check":"astro check","preview":"astro preview"},"dependencies":{"@astrojs/node":"^10.0.6","astro":"latest","gray-matter":"latest","marked":"latest"},"devDependencies":{"@astrojs/check":"latest","@types/node":"latest","typescript":"latest"}}
+{
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "build:static": "node scripts/build-static.mjs",
+    "build:static:example": "node scripts/build-static.mjs --example",
+    "check": "astro check",
+    "lint:knowledge": "node scripts/lint-knowledge.mjs",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/node": "^10.0.6",
+    "astro": "latest",
+    "gray-matter": "latest",
+    "marked": "latest"
+  },
+  "devDependencies": {
+    "@astrojs/check": "latest",
+    "@types/node": "latest",
+    "typescript": "latest"
+  }
+}

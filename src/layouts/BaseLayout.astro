@@ -1,6 +1,7 @@
 ﻿---
 import '../styles/global.css';
 import { createSearchItems } from '../lib/content';
+import { withBase, withoutBase } from '../lib/sitePaths';
 
 interface Props {
   title: string;
@@ -8,7 +9,7 @@ interface Props {
 }
 
 const { title, description = 'ISP 图像调试个人知识库' } = Astro.props;
-const pathname = Astro.url.pathname;
+const pathname = withoutBase(Astro.url.pathname);
 const searchItems = createSearchItems();
 const navItems = [
   { href: '/traditional/', label: '传统页面', icon: 'home' },
@@ -73,14 +74,14 @@ function isCurrent(href: string) {
   <body>
     <div class="app-frame">
       <aside class="app-sidebar" aria-label="知识库导航">
-        <a class="brand" href="/traditional/">
+        <a class="brand" href={withBase('/traditional/')}>
           <span class="brand-mark" aria-hidden="true"></span>
           <span>ISP Notes</span>
         </a>
 
         <nav class="side-nav" aria-label="主导航">
           {navItems.map((item) => (
-            <a class:list={['nav-link', { active: isCurrent(item.href) }]} href={item.href}>
+            <a class:list={['nav-link', { active: isCurrent(item.href) }]} href={withBase(item.href)}>
               <span class="nav-icon" set:html={icons[item.icon]} />
               <span>{item.label}</span>
             </a>
@@ -88,7 +89,7 @@ function isCurrent(href: string) {
         </nav>
 
         <div class="quick-links" aria-label="常用入口">
-          {quickLinks.map((item) => <a href={item.href}>{item.label}</a>)}
+          {quickLinks.map((item) => <a href={withBase(item.href)}>{item.label}</a>)}
         </div>
 
         <div class="sidebar-note">
@@ -115,8 +116,8 @@ function isCurrent(href: string) {
               <span class="theme-icon theme-icon-moon" set:html={icons.moon} />
               <span class="theme-icon theme-icon-sun" set:html={icons.sun} />
             </button>
-            <a class="outline-button" href="/allinai/">AllInAI</a>
-            <a class="outline-button" href="/knowledge/wiki/indexes/ISP调试知识库导航/">索引</a>
+            <a class="outline-button" href={withBase('/allinai/')}>AllInAI</a>
+            <a class="outline-button" href={withBase('/knowledge/wiki/indexes/ISP调试知识库导航/')}>索引</a>
           </div>
         </header>
 

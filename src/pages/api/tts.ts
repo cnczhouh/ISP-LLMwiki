@@ -1,9 +1,14 @@
 import type { APIRoute } from 'astro';
 import { generateTtsAudio, getTtsConfig, isTtsConfigured, ttsModelOptions } from '../../lib/llm';
 
-export const prerender = false;
-
 const maxTextLength = 1800;
+
+export const GET: APIRoute = () => json({
+  ok: false,
+  mode: 'static',
+  configured: false,
+  error: '静态部署不包含云端语音合成接口。浏览器会尝试使用本地朗读。',
+});
 
 export const POST: APIRoute = async ({ request }) => {
   try {

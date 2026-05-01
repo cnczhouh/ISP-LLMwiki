@@ -1,6 +1,7 @@
 ﻿import fs, { type Dirent } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import { withBase } from './sitePaths';
 
 export type PageKind =
   | 'indexes'
@@ -272,11 +273,11 @@ function getKind(relativePath: string): PageKind {
 
 
 function toPageUrl(slug: string): string {
-  return `/knowledge/${slug.split('/').map(encodePathSegment).join('/')}/`;
+  return withBase(`/knowledge/${slug.split('/').map(encodePathSegment).join('/')}/`);
 }
 
 function toRawUrl(slug: string): string {
-  return `/knowledge-files/${slug.split('/').map(encodePathSegment).join('/')}`;
+  return withBase(`/knowledge-files/${slug.split('/').map(encodePathSegment).join('/')}`);
 }
 
 function encodePathSegment(segment: string): string {
